@@ -1,5 +1,3 @@
-# usaf_image_analysis
-
 We try to perform image matching and rotation in this code.
 
 To run the code use python main.pyt <path_to_the_USAF_image>.
