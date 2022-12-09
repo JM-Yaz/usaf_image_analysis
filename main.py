@@ -314,7 +314,6 @@ def analyse_file(filename, generate_pdf=True):
 
     # Sort the matches by distance and take the 10 first values
     matches = sorted(matches, key=lambda x: x.distance)
-    print(len(matches))
     matches = matches[:10]
 
     # Extract the coordinates of the matched keypoints
