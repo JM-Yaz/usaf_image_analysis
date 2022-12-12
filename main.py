@@ -302,8 +302,8 @@ def analyse_file(filename, generate_pdf=True):
     else:
         new_fn = 'rotated_' + filename
 
-    gray_image = imread(filename, as_gray=1).astype(np.uint8)
-    ref_image = imread('unrotated.bmp', as_gray=1).astype(np.uint8)
+    gray_image = imread('unrotated.bmp', as_gray=1).astype(np.uint8)
+    ref_image = imread('lab.bmp', as_gray=1).astype(np.uint8)
 
     # Detect and match features between the images using the ORB algorithm
     orb = cv2.ORB_create()
