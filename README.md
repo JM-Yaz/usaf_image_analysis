@@ -1,6 +1,6 @@
 We try to perform image matching and rotation in this code.
 
-To run the code use python main.pyt <path_to_the_USAF_image>.
+To run the code use python main.py <path_to_the_USAF_image>.
 
 Please note that the unrotated.bmp image is neeeded to rotate the taken image and use it as a reference for the rotations.
 
