@@ -23,6 +23,7 @@ import cv2
 
 import scipy.ndimage
 import scipy.interpolate
+import scipy.stats as st
 import os.path
 import os
 import sys
@@ -43,69 +44,66 @@ LP = np.array(
 
 
 #################### Rotate the image so the bars are X/Y aligned #############
-def find_image_orientation(gray_image, fuzziness=5):
-    """Determine the angle we need to rotate a USAF target image by.
+# def find_image_orientation(gray_image, fuzziness=5):
+#     """Determine the angle we need to rotate a USAF target image by.
 
-    This is a two-step "straightener", first looking at the gradient directions
-    in the image, then fine-tuning it to get a more accurate answer.  Rotating
-    the image by this amount should cause the bars to align with the x/y axes.
-    It may be beneficial to do this iteratively, i.e. run it, then rotate, then
-    run it again, then tweak - this should help avoid any issues with linearity
-    in the calculation of gradient angles.
+#     This is a two-step "straightener", first looking at the gradient directions
+#     in the image, then fine-tuning it to get a more accurate answer.  Rotating
+#     the image by this amount should cause the bars to align with the x/y axes.
+#     It may be beneficial to do this iteratively, i.e. run it, then rotate, then
+#     run it again, then tweak - this should help avoid any issues with linearity
+#     in the calculation of gradient angles.
 
-    fuzziness sets the size of the Gaussian kernel used for gradient estimation
+#     fuzziness sets the size of the Gaussian kernel used for gradient estimation
 
-    returns: the angle of the bars, as a floating-point number.
-    """
-    image = gray_image / gray_image.max()
-    # Calculate local gradient directions (to find angle)
-    Gx = scipy.ndimage.gaussian_filter1d(image, axis=0, order=1, sigma=fuzziness)
-    Gy = scipy.ndimage.gaussian_filter1d(image, axis=1, order=1, sigma=fuzziness)
-    angles = np.arctan2(Gx, Gy)
-    weights = Gx ** 2 + Gy ** 2
+#     returns: the angle of the bars, as a floating-point number.
+#     """
+#     image = gray_image / gray_image.max()
+#     # Calculate local gradient directions (to find angle)
+#     Gx = scipy.ndimage.gaussian_filter1d(image, axis=0, order=1, sigma=fuzziness)
+#     Gy = scipy.ndimage.gaussian_filter1d(image, axis=1, order=1, sigma=fuzziness)
+#     angles = np.arctan2(Gx, Gy)
+#     weights = Gx ** 2 + Gy ** 2
 
-    # First, find the histogram and pick the maximum
-    h, e = np.histogram(angles % (np.pi), bins=100, weights=weights)
-    # plt.plot((e[1:] + e[:-1])/2, h, 'o-')
-    rough_angle = ((e[1:] + e[:-1]) / 2)[np.argmax(h)]  # pick the peak
-    bin_width = np.mean(np.diff(e))
+#     # First, find the histogram and pick the maximum
+#     h, e = np.histogram(angles % (np.pi), bins=100, weights=weights)
+#     # plt.plot((e[1:] + e[:-1])/2, h, 'o-')
+#     rough_angle = ((e[1:] + e[:-1]) / 2)[np.argmax(h)]  # pick the peak
+#     bin_width = np.mean(np.diff(e))
 
-    # Recalculate the histogram about the peak (avoids wrapping issues)
-    h, e = np.histogram(((angles - rough_angle + np.pi / 4) % (np.pi / 2)) - np.pi / 4,
-                        bins=50, range=(-0.1, 0.1), weights=weights)
-    h *= bin_width / np.mean(np.diff(e))
-    h /= 2
-    # plt.plot((e[1:] + e[:-1])/2+rough_angle, h)
+#     # Recalculate the histogram about the peak (avoids wrapping issues)
+#     h, e = np.histogram(((angles - rough_angle + np.pi / 4) % (np.pi / 2)) - np.pi / 4,
+#                         bins=50, range=(-0.1, 0.1), weights=weights)
+#     h *= bin_width / np.mean(np.diff(e))
+#     h /= 2
+#     # plt.plot((e[1:] + e[:-1])/2+rough_angle, h)
 
-    # Use spline interpolation to fit the peak and find the rotation angle
-    spline = scipy.interpolate.UnivariateSpline(e[1:-1], np.diff(h))
-    root = spline.roots()[np.argmin(spline.roots() ** 2)]  # pick root nearest zero
-    # plt.plot(e+rough_angle, spline(e))
+#     # Use spline interpolation to fit the peak and find the rotation angle
+#     spline = scipy.interpolate.UnivariateSpline(e[1:-1], np.diff(h))
+#     root = spline.roots()[np.argmin(spline.roots() ** 2)]  # pick root nearest zero
+#     # plt.plot(e+rough_angle, spline(e))
 
-    fine_angle = root + rough_angle
+#     fine_angle = root + rough_angle
 
-    # TODO: do we want to rotate the image here and repeat the above analysis?
+#     # TODO: do we want to rotate the image here and repeat the above analysis?
 
-    return fine_angle
-
-
-################### Find the bars ############################
+#     return fine_angle
 
 def template(n):
     """Generate a template image of three horizontal bars, n x n pixels
-
+    
     NB the bars occupy the central square of the template, with a margin
     equal to one bar all around.  There are 3 bars and 2 spaces between,
     so bars are m=n/7 wide.
-
+    
     returns: n x n numpy array, uint8
     """
     n = int(n)
     template = np.ones((n, n), dtype=np.uint8)
     template *= 255
-
+    
     for i in range(3):
-        template[n // 7:-n // 7, (1 + 2 * i) * n // 7:(2 + 2 * i) * n // 7] = 0
+        template[n//7:-n//7,  (1 + 2*i) * n//7:(2 + 2*i) * n//7] = 0
     return template
 
 
@@ -131,10 +129,10 @@ def find_elements(image,
     start = np.log(image.shape[0] / 2) / np.log(scale_increment) - n_scales
     print("Searching for targets", end='')
     for nf in np.logspace(start, start + n_scales, base=scale_increment):
-        if nf < 20:  # There's no point bothering with tiny boxes...
+        if nf < 24:  # There's no point bothering with tiny boxes...
             continue
         templ = template(nf)  # NB n is rounded down from nf
-        res = cv2.matchTemplate(image, templ, cv2.TM_CCOEFF_NORMED)
+        res = cv2.matchTemplate(image, templ, cv2.TM_CCOEFF_NORMED) #slides a window over the image and compares it to the template
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
         matches.append((max_val, max_loc, templ.shape[0]))
         print('.', end='')
@@ -211,74 +209,115 @@ def plot_matches(image, elements, elements_T=[], pdf=None):
 def approx_contrast(image, pdf=None, ax=None):
     # get index of middle row
     mid_row = image.shape[0] // 2
+    # print(image.shape[0])
+    # print(image.shape)
     # width is 3
-    map_center, mip_center, min_peaks, max_peaks = approx_contrast_by_row(image, mid_row)
+    contrast_center, first_plot, last_plot = approx_contrast_by_row(image, mid_row)
     y = image[mid_row]
     x = [x for x in range(len(y))]
-    ax.plot(max_peaks, y[max_peaks], "x", color='red')
-    ax.plot(min_peaks, y[min_peaks], "x", color='red')
-    ax.plot(x, y)
+    y[:first_plot+1] = 0
+    y[last_plot:] = 0
+    # ax.plot(max_peaks, y[max_peaks], "x", color='red')
+    # ax.plot(min_peaks, y[min_peaks], "x", color='green')
+    y_masked = np.ma.masked_equal(y, 0)    
+    y_masked[:first_plot+1] = np.ma.masked
+    y_masked[last_plot:] = np.ma.masked
+    ax.plot(x, y_masked)
+    ax.set_xlim([0, len(y)])
+    ax.set_xlabel('Pixel')
+    ax.set_ylabel('Intensity')
+    ax.set_ylim([0, 260])
+    ax.set_yticks([0, 50, 100, 150, 200, 255])
+    ax.set_yticklabels(['0', '50', '100', '150', '200', '255'])
+    ax.yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(5))
+    ax.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(0.1*len(x))) # minor ticks every 0.1*pixel_amount units
+    # Show grid lines
+    ax.grid(which='both', alpha=0.2)
+    contrast_mean = [contrast_center]
 
-    map_bot, mip_bot, _, _ = approx_contrast_by_row(image, mid_row + 1)
-    map_top, mip_top, _, _ = approx_contrast_by_row(image, mid_row - 1)
-    map_mean = (map_center + map_bot + map_top -
-                mip_center - mip_bot - mip_top) / (map_center +
-                                                   map_bot + map_top +
-                                                   mip_center + mip_bot + mip_top)
-    pdf.attach_note(f'Contrast (3 rows): {map_mean}')
+    for i in range(1, mid_row//4):
+        contrast, _ , _ = approx_contrast_by_row(image, mid_row + i)
+        contrast_mean.append(contrast)
+        contrast, _ , _ = approx_contrast_by_row(image, mid_row - i)
+        contrast_mean.append(contrast)
+    num_rows = len(contrast_mean)
+    contrast_mean = np.mean(contrast_mean)
+
+    pdf.attach_note(f'Contrast ({num_rows} rows): {contrast_mean}')
     pdf.savefig()
     plt.close()
-    return map_mean
-
+    return contrast_mean
 
 def approx_contrast_by_row(image, row):
-    y = image[row]
+    y = np.array(image[row])
+    middle_pt = np.mean(y)
 
-    # adapt if no. of local minima/maxima is unequal 3
-    min_dist = len(y) // 4
-    max_peaks, _ = find_peaks(y, height=0, distance=min_dist)
-    # discard 4th local maxima
-    if len(max_peaks) == 4:
-        max_peaks = max_peaks[:-1]
+    max_peaks = y[y > middle_pt]
+    max_peaks_arg = np.argwhere(y > middle_pt)[:, 0]
+    min_peaks = y[y < middle_pt]
+    min_peaks_arg = np.argwhere(y < middle_pt)[:, 0]
+    first_plot = 0
+    last_plot = len(y)
+    if max_peaks_arg[0] < min_peaks_arg[0]:
+        first_max = np.where(max_peaks_arg > min_peaks_arg[0])[0][0]
+        max_peaks = max_peaks[first_max:]
+        first_plot = min_peaks_arg[0]
+    if max_peaks_arg[-1] > min_peaks_arg[-1]:
+        last_max = np.where(max_peaks_arg < min_peaks_arg[-1])[0][-1]
+        max_peaks = max_peaks[:last_max+1]
+        last_plot = min_peaks_arg[-1]
 
-    min_peaks, _ = find_peaks(-y, height=0, distance=min_dist)
-    if len(min_peaks) == 4:
-        min_peaks = min_peaks[:-1]
+    max_peaks, _ = st.mode(max_peaks, keepdims=False)
+    min_peaks, _ = st.mode(min_peaks, keepdims=False)
 
-    sum_map = sum([y[x] for x in max_peaks])
-    sum_mip = sum([y[x] for x in min_peaks])
-    return sum_map, sum_mip, max_peaks, min_peaks
-
+    
+    I_max = np.int64(max_peaks)
+    I_min = np.int64(min_peaks)
+    contrast = (I_max - I_min) / (I_max + I_min)
+    return contrast, first_plot, last_plot
 
 def compute_mtf_curve(image, elements, pdf=None):
     _, axes = None, [[None] * len(elements)] * 2
     contrasts = []
 
     for (score, (x, y), n), ax0, ax1 in zip(elements, axes[0], axes[1]):
-        f, (ax1, ax2) = plt.subplots(1, 2)
+        f, (ax1, ax_empty, ax2) = plt.subplots(1, 3, gridspec_kw={'width_ratios': [1, 0.175, 1]})
+        # Remove ticks and labels from the empty subplot
+        ax_empty.set_xticks([])
+        ax_empty.set_yticks([])
+        ax_empty.set_frame_on(False)
         gray_roi = image[y:y + n, x:x + n]
-        ax1.imshow(gray_roi)
-        # ax1.plot()
+        ax1.imshow(gray_roi, vmin=0, vmax=255)
+        ax1.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(0.1*n)) # minor ticks every 5 units
+        ax1.xaxis.grid(which='minor', alpha=0.2)
+        # Show the colorbar of ax1, values are in the range of 0 to 255 and no longer normalized
+        # This helps to compare the contrast of the different groups and see where the lighting affects results
+        f.colorbar(ax1.get_images()[0], ax=ax1, pad=0.05)
         contrasts.append(approx_contrast(gray_roi, pdf, ax2))
 
     plt.plot(LP[:len(contrasts)], contrasts, 'o-')
     plt.xlabel("no. line pairs per mm")
-    plt.ylabel("contrast (3 rows)")
+    # scale the y axis from 0 to 1
+    plt.ylim((0, 1.0))
+    plt.ylabel("contrast")
+    plt.title("MTF curve")
+    # Show girid lines
+    plt.grid(which='both')
+    plt.gca().yaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(0.05))
+    plt.gca().xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(0.1))
     pdf.savefig()
     plt.close()
 
 
 def analyse_image(gray_image, pdf=None):
-    """Find USAF groups in the image and plot their contrast as a MTF curve.
+    """
+    Find USAF groups in the image and plot their contrast as a MTF curve.
 
     This is the top-level function that you should call to analyse an image.
     The image should be a 2D numpy array.  If the optional "pdf" argument is
     supplied, several graphs will be plotted into the given PdfPages object.
-
-    returns
-
-    fig is a matplotlib figure object plotting to the image with each
-    element highlighted in a box."""
+    
+    """
     elementsx, matchesx = find_elements(gray_image, return_all=True)
     elementsy, matchesy = find_elements(gray_image.T, return_all=True)
 
@@ -302,37 +341,30 @@ def analyse_file(filename, generate_pdf=True):
     else:
         new_fn = 'rotated_' + filename
 
-    gray_image = imread('unrotated.bmp', as_gray=1).astype(np.uint8)
-    ref_image = imread('lab.bmp', as_gray=1).astype(np.uint8)
+    gray_image = imread(filename, as_gray=1)
+    # ref_image = imread('rotated_unrotated.bmp', as_gray=1).astype(np.uint8)
 
-    # Detect and match features between the images using the ORB algorithm
-    orb = cv2.ORB_create()
-    keypoints_1, descriptors_1 = orb.detectAndCompute(gray_image, None)
-    keypoints_2, descriptors_2 = orb.detectAndCompute(ref_image, None)
-    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    matches = matcher.match(descriptors_1, descriptors_2)
+#     # Use the ORB algorithm to detect keypoints and compute descriptors
+#     orb = cv2.ORB_create()
+#     real_kp, real_desc = orb.detectAndCompute(gray_image, None)
+#     ideal_kp, ideal_desc = orb.detectAndCompute(ref_image, None)
 
-    # Sort the matches by distance and take the 10 first values
-    matches = sorted(matches, key=lambda x: x.distance)
-    matches = matches[:10]
+#    # Match the keypoints using the Brute Force matcher
+#     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+#     matches = bf.match(ideal_desc, real_desc)
 
-    # Extract the coordinates of the matched keypoints
-    src_pts = np.float32([keypoints_1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-    dst_pts = np.float32([keypoints_2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+#     # Find rotation and translation
+#     src_pts = np.float32([ideal_kp[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
+#     dst_pts = np.float32([real_kp[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+#     M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
 
-    # Use the homography matrix to calculate the rotation angle
-    h, _ = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-    rotation_matrix, _ = cv2.Rodrigues(h[:, :3])
-    angle = np.rad2deg(np.arctan2(rotation_matrix[1, 0], rotation_matrix[0, 0]))
+#     # Use the homography matrix to rotate the image
+#     rows, cols = gray_image.shape
+#     rotated_img = cv2.warpPerspective(gray_image, M, (cols, rows))
 
-    # Rotate the target image using the rotation angle
-    rows, cols = ref_image.shape
-    center = (cols / 2, rows / 2)
-    M = cv2.getRotationMatrix2D(center, angle, 1)
-    rotated_img = cv2.warpAffine(ref_image, M, (cols, rows))
 
-    io.imsave(new_fn, rotated_img)
-    gray_image = imread(new_fn).astype(np.uint8)
+#     # Save the rotated image
+#     io.imsave(new_fn, rotated_img)
 
     with PdfPages(new_fn + "_analysis.pdf") as pdf:
         analyse_image(gray_image, pdf)
