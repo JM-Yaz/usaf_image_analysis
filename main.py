@@ -8,6 +8,7 @@ See: https://en.wikipedia.org/wiki/1951_USAF_resolution_test_chart
     modified by Louis Ngo 2022
     modified by Jean-Marie Yazbeck 2022-2023
 
+
 From Wikipedia, the number of line pairs/mm is 2^(g+(h-1)/6) where g is the
 "group number" and h is the "element number".  Each group has 6 elements,
 numbered from 1 to 6.  My ThorLabs test target goes down to group 7, meaning
@@ -21,18 +22,16 @@ import matplotlib.patches
 import numpy as np
 import cv2
 
-import scipy.ndimage
-import scipy.interpolate
 import scipy.stats as st
 import os.path
 import os
 import sys
 from skimage.io import imread
 from matplotlib.backends.backend_pdf import PdfPages
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 from skimage import io
 from skimage.transform import rotate
-from scipy.signal import find_peaks
-import math
 
 LP = np.array(
     [0.250, 0.281, 0.315, 0.354, 0.397, 0.445,
@@ -264,9 +263,7 @@ def approx_contrast(image, pdf=None, ax=None):
     # Add the contrast value to the PDF object (if provided)
     if pdf is not None:
         pdf.attach_note(f'Contrast ({num_rows} rows): {contrast_mean}')
-
-    # Save the plot to the PDF object (if provided)
-    if pdf is not None:
+        # Save the plot to the PDF object (if provided)
         pdf.savefig()
 
     # Close the plot
@@ -482,13 +479,23 @@ def analyse_file(filename, generate_pdf=True):
     else:
         new_fn = 'rotated_' + filename
 
-    gray_image = imread(filename, as_gray=1)
+    gray_image = imread(filename)
+    rotated_img = rotate(gray_image, -45)
 
-#     # Save the rotated image
-#     io.imsave(new_fn, rotated_img)
+    # Convert the rotated image to uint8 since rotate returns a float64
+    rotated_img = (rotated_img * 255).astype(np.uint8)
 
-    with PdfPages(new_fn + "_analysis.pdf") as pdf:
+    # Save the rotated image
+    io.imsave(new_fn, rotated_img)
+    # Read the rotated image as uint8 to allow matchTemplate to work properly. Else change template to needed format
+    gray_image = imread(new_fn, as_gray=True).astype(np.uint8)
+
+    pdf_name = new_fn + "_analysis.pdf"
+
+    with PdfPages(pdf_name) as pdf:
         analyse_image(gray_image, pdf)
+
+
 
 
 def analyse_folders(datasets):
@@ -508,6 +515,7 @@ def analyse_folders(datasets):
         for filename in files:
             print("\nAnalysing file {}".format(filename))
             analyse_file(filename)
+    
 
 
 if __name__ == '__main__':
