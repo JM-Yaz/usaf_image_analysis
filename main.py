@@ -28,8 +28,6 @@ import os
 import sys
 from skimage.io import imread
 from matplotlib.backends.backend_pdf import PdfPages
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 from skimage import io
 from skimage.transform import rotate
 
