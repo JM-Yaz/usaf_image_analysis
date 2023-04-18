@@ -1,19 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 Analyse a USAF test target image, to determine the image's dimensions.
-
 See: https://en.wikipedia.org/wiki/1951_USAF_resolution_test_chart
-
 (c) Richard Bowman 2017, released under GNU GPL
     modified by Louis Ngo 2022
     modified by Jean-Marie Yazbeck 2022-2023
-
-
 From Wikipedia, the number of line pairs/mm is 2^(g+(h-1)/6) where g is the
 "group number" and h is the "element number".  Each group has 6 elements,
 numbered from 1 to 6.  My ThorLabs test target goes down to group 7, meaning
 the finest pitch is 2^(7+(6-1)/6)=2^(47/8)=
-
 """
 from __future__ import print_function
 from matplotlib import pyplot as plt
@@ -42,11 +37,9 @@ LP = np.array(
 
 def template(n):
     """Generate a template image of three horizontal bars, n x n pixels
-
     NB the bars occupy the central square of the template, with a margin
     equal to one bar all around.  There are 3 bars and 2 spaces between,
     so bars are m=n/7 wide.
-
     returns: n x n numpy array, uint8
     """
     n = int(n)
@@ -64,9 +57,7 @@ def find_elements(image,
                   n_scales=300,
                   return_all=True):
     """Use a multi-scale template match to find groups of 3 bars in the image.
-
     We return a list of tuples, (score, (x,y), size) for each match.
-
     image: a 2D uint8 numpy array in which to search
     template_fn: a function to generate a square uint8 array, which takes one
         argument n that specifies the side length of the square.
@@ -74,7 +65,6 @@ def find_elements(image,
         iteration.  Should be a floating point number a little bigger than 1.0
     n_scales: the number of sizes searched.  The largest size is half the image
         size.
-
     """
     matches = []
     start = np.log(image.shape[0] / 2) / np.log(scale_increment) - n_scales
@@ -100,7 +90,6 @@ def find_elements(image,
     # Group overlapping matches together, and pick the best one
     def overlap1d(x1, n1, x2, n2):
         """Return the overlapping length of two 1d regions
-
         Draw four positions, indicating the edges of the regions (i.e. x1,
         c1+n1, x2, x2+n2).  The smallest distance between a starting edge (x1
         or x2) and a stopping edge (x+n) gives the overlap.  This will be
@@ -161,12 +150,10 @@ def plot_matches(image, elements, elements_T=[], pdf=None):
 def approx_contrast(image, pdf=None, ax=None):
     """
     Compute the approximate contrast of an image.
-
     Args:
         image (ndarray): The input grayscale image.
         pdf (PdfPages or None): A PDF object to save the plot to (optional).
         ax (Axes or None): The Matplotlib axes to plot on (optional).
-
     Returns:
         float: The approximate contrast of the image.
     """
@@ -274,15 +261,12 @@ def approx_contrast(image, pdf=None, ax=None):
 def approx_contrast_by_row(image, row):
     """
     Calculates the approximate contrast of a row in an image.
-
     Args:
         image (numpy.ndarray): The image to calculate the contrast of.
         row (int): The row number to calculate the contrast of.
-
     Returns:
         tuple: A tuple containing the contrast value and the first and last plot points
         to consider for the plotting of the intensity.
-
     NB: The first and last plot points are the first and last points of the darkest areas.
     NB 2: We are also considering this range of points to calculate the contrast. The
     first and last brightest regions are not considered.
@@ -331,13 +315,11 @@ def approx_contrast_by_row(image, row):
 def compute_mtf_curve(image, elements, pdf=None, horizontal=0):
     """
     Computes the modulation transfer function (MTF) curve for an image.
-
     Args:
         image (numpy.ndarray): The input image as a NumPy array.
         elements (list): A list of tuples representing the subregions of the image to analyze.
             Each tuple should contain a contrast score, a (x, y) position, and a size n.
         pdf (str): The filename of a PDF file to save the MTF curves to (optional).
-
     Returns:
         list: A list of the contrast scores for each element in the input list.
     """
@@ -448,11 +430,9 @@ def compute_mtf_curve(image, elements, pdf=None, horizontal=0):
 def analyse_image(gray_image, pdf=None):
     """
     Find USAF groups in the image and plot their contrast as a MTF curve.
-
     This is the top-level function that you should call to analyse an image.
     The image should be a 2D numpy array.  If the optional "pdf" argument is
     supplied, several graphs will be plotted into the given PdfPages object.
-
     """
     elementsx, matchesx = find_elements(gray_image, return_all=True)
     elementsy, matchesy = find_elements(gray_image.T, return_all=True)
@@ -477,10 +457,10 @@ def analyse_file(filename, generate_pdf=True):
     else:
         new_fn = 'rotated_' + filename
 
-    gray_image = imread(filename)
+    gray_image = imread(filename, as_gray=True)
     rotated_img = rotate(gray_image, -45)
 
-    # Convert the rotated image to uint8 since rotate returns a float64
+    # # Convert the rotated image to uint8 since rotate returns a float64
     rotated_img = (rotated_img * 255).astype(np.uint8)
 
     # Save the rotated image
@@ -498,7 +478,6 @@ def analyse_file(filename, generate_pdf=True):
 
 def analyse_folders(datasets):
     """Analyse a folder hierarchy containing a number of calibration images.
-
     Given a folder that contains a number of other folders (one per microscope usually),
     find all the USAF images (<datasets>/*/usaf_*.jpg) and analyse them.  It also generates
     a summary file in CSV format, and a PDF with all the images and the detected elements.
