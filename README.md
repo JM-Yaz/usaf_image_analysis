@@ -1,7 +1,5 @@
-The following document explains the code that analyzes a USAF test target image to determine its dimensions. The USAF test target is a common resolution test pattern used to determine the resolving power of optical systems such as microscopes and cameras.
-
 ## Overview
-
+The following document explains the code that analyzes a USAF test target image to determine its dimensions. The USAF test target is a common resolution test pattern used to determine the resolving power of optical systems such as microscopes and cameras.
 The script was initially developed by Richard Bowman in 2017 and later modified by Louis Ngo and Jean-Marie Yazbeck in 2022-2023.
 
 ### Dependencies
