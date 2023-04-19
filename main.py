@@ -67,22 +67,27 @@ def find_elements(image,
         size.
     """
     matches = []
+    # Calculate the starting scale factor for template matching
     start = np.log(image.shape[0] / 2) / np.log(scale_increment) - n_scales
+
     print("Searching for targets", end='')
+    # Loop over different scales (template sizes) for template matching
     for nf in np.logspace(start, start + n_scales, base=scale_increment):
-        if nf < 24:  # There's no point bothering with tiny boxes...
+        if nf < 24:  # Skip very small template sizes
             continue
-        templ = template(nf)  # NB n is rounded down from nf
-        # slides a window over the image and compares it to the template
+        templ = template(nf)  # Generate template of size nf (rounded down)
+
+        # Perform template matching and find the best match location
         res = cv2.matchTemplate(image, templ, cv2.TM_CCOEFF_NORMED)
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+
+        # Save match results
         matches.append((max_val, max_loc, templ.shape[0]))
         print('.', end='')
     print("done")
-
     print("len matches: ", len(matches))
 
-    # Take the matches at different scales and filter out the good ones
+    # Filter matches based on a threshold score
     scores = np.array([m[0] for m in matches])
     threshold_score = (scores.max() + scores.min()) / 2
     filtered_matches = [m for m in matches if m[0] > threshold_score]
@@ -109,18 +114,21 @@ def find_elements(image,
                 for m2 in current_group:
                     s1, (x1, y1), n1 = m1
                     s2, (x2, y2), n2 = m2
+                    # Calculate the overlap between two matches
                     overlap = (overlap1d(x1, n1, x2, n2) *
                                overlap1d(y1, n1, y2, n2))
+                    # If matches overlap, add them to the current group
                     if overlap > 0.5 * min(n1, n2) ** 2:
                         new_matches.append(m1)
                         filtered_matches.remove(m1)
                         break
-        # Now we should have current_group full of overlapping matches.  Pick
-        # the best one.
+
+        # Select the best match from the current group based on the score
         best_score_index = np.argmax([m[0] for m in current_group])
         unique_matches.append(current_group[best_score_index])
 
     elements = unique_matches
+    # Return the unique matches and all matches (if return_all is True)
     if return_all:
         return elements, matches
     else:
@@ -411,6 +419,8 @@ def compute_mtf_curve(image, elements, pdf=None, horizontal=0):
                 major_ticks_location.append(plt.gca().get_xticks()[i])
         else:
             major_ticks_location.append(plt.gca().get_xticks()[i])
+
+    # Beautify the plot
     plt.gca().set_xticks(minor_ticks_location, minor=True)
     plt.gca().set_xticks(major_ticks_location, major=True, visible=True)
     plt.tick_params(axis='x', which='major', length=5, color='blue',
@@ -439,6 +449,7 @@ def analyse_image(gray_image, pdf=None):
 
     plot_matches(gray_image, elementsx, elementsy, pdf)
     compute_mtf_curve(gray_image, elementsx, pdf)
+    # horizontal=1 means that the pairs are horizontal, it is just a visual thing for the pdf
     compute_mtf_curve(gray_image.T, elementsy, pdf, horizontal=1)
 
 
@@ -474,8 +485,6 @@ def analyse_file(filename, generate_pdf=True):
         analyse_image(gray_image, pdf)
 
 
-
-
 def analyse_folders(datasets):
     """Analyse a folder hierarchy containing a number of calibration images.
     Given a folder that contains a number of other folders (one per microscope usually),
@@ -492,7 +501,6 @@ def analyse_folders(datasets):
         for filename in files:
             print("\nAnalysing file {}".format(filename))
             analyse_file(filename)
-    
 
 
 if __name__ == '__main__':
