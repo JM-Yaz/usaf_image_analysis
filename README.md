@@ -75,6 +75,10 @@ This function computes the MTF curve for the image using the found elements. It 
 - pdf: The PDF file to save the plot to.
 - horizontal: This is only a flag to mention in the PDF that we are computing the MTF curve for horizontal pairs. That's when it is set to 1.
 
+`add_execution_info(pdf: PdfPages)`:
+This function adds a page to the PDF with information about the execution. It takes the following inputs:
+- pdf (PdfPages): A PdfPages object representing the PDF file.
+
 `analyse_image(gray_image, pdf=None)`:
 This function performs the analysis on the input grayscale image. It takes the following inputs:
 

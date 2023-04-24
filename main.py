@@ -13,6 +13,7 @@ the finest pitch is 2^(7+(6-1)/6)=2^(47/8)=
 from __future__ import print_function
 from matplotlib import pyplot as plt
 import matplotlib.patches
+import datetime
 
 import numpy as np
 import cv2
@@ -453,6 +454,46 @@ def analyse_image(gray_image, pdf=None):
     compute_mtf_curve(gray_image.T, elementsy, pdf, horizontal=1)
 
 
+def add_execution_info(pdf: PdfPages):
+    """
+    Adds a page to the PDF with information about the execution.
+
+    Args:
+        pdf (PdfPages): A PdfPages object representing the PDF file.
+    """
+    # Get the current time and format it as a string.
+    now = datetime.datetime.now()
+    timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
+
+    # Get the names of the programmers.
+    programmer_names = ["Richard Bowman", "Louis Ngo", "Jean-Marie Yazbeck"]
+
+    # List of the main libraries being used.
+    main_libraries = ["numpy", "cv2", "matplotlib", "scipy", "skimage", "os", "sys", "datetime"]
+
+
+    # Get the Python interpreter version.
+    python_version = sys.version.split()[0]
+
+    # Create a new page with the execution information.
+    fig = plt.figure()
+    plt.axis('off')
+    libraries_text = "\n".join(main_libraries)
+    text = (
+        f"Original script provided by\n"
+        f"Richard Bowman in 2017 on https://github.com/rwb27/usaf_analysis\n"
+        f"Updated by {', '.join(programmer_names[1:])}\n"
+        f"Current script runs from the version edited by\n"
+        f"Jean-Marie Yazbeck in 2023 on https://github.com/JM-Yaz/usaf_image_analysis\n"
+        f"Libraries used:\n{libraries_text}\n"
+        f"Python version: {python_version}\n"
+        f"Executed on {timestamp}"
+    )
+    plt.text(0.5, 0.5, text, ha='center', va='center', fontsize=10)
+    pdf.savefig(fig)
+    plt.close()
+
+
 def analyse_file(filename, generate_pdf=True):
     """Analyse the image file specified by the given filename"""
     delim = None
@@ -482,6 +523,7 @@ def analyse_file(filename, generate_pdf=True):
     pdf_name = new_fn + "_analysis.pdf"
 
     with PdfPages(pdf_name) as pdf:
+        add_execution_info(pdf)
         analyse_image(gray_image, pdf)
 
 
